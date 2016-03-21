@@ -42,7 +42,7 @@ MODULE_AUTHOR("Matthieu Proucelle");
 MODULE_DESCRIPTION("GPIO and MCP23017 Arcade Joystick Driver");
 MODULE_LICENSE("GPL");
 
-#define MK_MAX_DEVICES		2
+#define MK_MAX_DEVICES		1
 
 #ifdef RPI2
 #define PERI_BASE        0x3F000000
@@ -116,15 +116,15 @@ struct mk_subdev {
 
 static struct mk *mk_base;
 
-static const int mk_max_arcade_buttons = 12;
+static const int mk_max_arcade_buttons = 16;
 
-// Map of the gpios :                     up, down, left, right, start, select, a,  b,  tr, y,  x,  tl, hk
-static const int mk_arcade_gpio_maps[] = {4,  17,    27,  22,    10,    9,      25, 24, 23, 18, 15, 14 };
+// Map of the gpios :                     up, down, left, right, start, select, a, b, tr, y,  x,  tl, tr2, tl2, thumbl, thumbr
+static const int mk_arcade_gpio_maps[] = {4,  17,    27,  22,    14,    15,     5, 6, 18, 13, 19, 24, 23,  25,  26,     12};
 // 2nd joystick on the b+ GPIOS                 up, down, left, right, start, select, a,  b,  tr, y,  x,  tl, hk
 static const int mk_arcade_gpio_maps_bplus[] = {11, 5,    6,    13,    19,    26,     21, 20, 16, 12, 7,  8 };
 
 static const short mk_arcade_gpio_btn[] = {
-    BTN_START, BTN_SELECT, BTN_A, BTN_B, BTN_TR, BTN_Y, BTN_X, BTN_TL
+    BTN_0, BTN_1, BTN_2, BTN_3, BTN_START, BTN_SELECT, BTN_A, BTN_B, BTN_TR, BTN_Y, BTN_X, BTN_TL, BTN_TR2, BTN_TL2, BTN_THUMBL, BTN_THUMBR
 };
 
 static const char *mk_names[] = {
@@ -166,10 +166,11 @@ static void mk_gpio_read_packet(struct mk_pad * pad, unsigned char *data) {
 static void mk_input_report(struct mk_pad * pad, unsigned char * data) {
     struct input_dev * dev = pad->dev;
     int j;
-    input_report_abs(dev, ABS_Y, !data[0]-!data[1]);
-    input_report_abs(dev, ABS_X, !data[2]-!data[3]);
-    for (j = 4; j < mk_max_arcade_buttons; j++) {
-        input_report_key(dev, mk_arcade_gpio_btn[j - 4], data[j]);
+    // TODO: replace with SPI interface (using 2xPSP style joysticks and 2xMCP3002 ADC)
+    //input_report_abs(dev, ABS_Y, !data[0]-!data[1]);
+    //input_report_abs(dev, ABS_X, !data[2]-!data[3]);
+    for (j = 0; j < mk_max_arcade_buttons; j++) {
+        input_report_key(dev, mk_arcade_gpio_btn[j], data[j]);
     }
     input_sync(dev);
 }
@@ -272,7 +273,8 @@ static int __init mk_setup_pad(struct mk *mk, int idx, int pad_type_arg) {
             for (i = 0; i < mk_max_arcade_buttons; i++) {
                 setGpioAsInput(mk_arcade_gpio_maps[i]);
             }
-            setGpioPullUps(0xBC6C610);
+            // binary flags: 1111 1100 1110 1111 0000 0111 0000
+            setGpioPullUps(0xFCEF070);
             printk("GPIO configured for pad%d\n", idx);
             break;
         case MK_ARCADE_GPIO_BPLUS:
